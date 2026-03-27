@@ -11,6 +11,7 @@ import {
   ArrowLeft,
   Loader2,
   RotateCcw,
+  Download,
 } from "lucide-react";
 
 /* ───────── types ───────── */
@@ -43,7 +44,10 @@ function Select({ label, value, placeholder, options, onChange }: SelectProps) {
 
   return (
     <div className="flex-1 min-w-[200px]" ref={ref}>
-      <label className="block text-sm font-medium mb-2 tracking-wide" style={{ fontFamily: "var(--font-body)" }}>
+      <label
+        className="block text-sm font-medium mb-2 tracking-wide"
+        style={{ fontFamily: "var(--font-body)" }}
+      >
         {label}
       </label>
       <button
@@ -71,7 +75,9 @@ function Select({ label, value, placeholder, options, onChange }: SelectProps) {
               className="w-full px-4 py-3 text-left hover:bg-[var(--color-teal-light)] transition-colors flex items-center justify-between"
             >
               <span>{opt.label}</span>
-              {value === opt.value && <Check className="w-4 h-4 text-[var(--color-teal)]" />}
+              {value === opt.value && (
+                <Check className="w-4 h-4 text-[var(--color-teal)]" />
+              )}
             </button>
           ))}
         </div>
@@ -88,7 +94,9 @@ function Stepper({ current }: { current: Step }) {
         <div key={s} className="flex items-center">
           <div
             className={`w-3 h-3 rounded-full transition-all duration-300 ${
-              s <= current ? "bg-[var(--color-teal)] scale-110" : "bg-gray-300"
+              s <= current
+                ? "bg-[var(--color-teal)] scale-110"
+                : "bg-gray-300"
             }`}
           />
           {i < 2 && (
@@ -149,14 +157,11 @@ export default function Home() {
   const startRecording = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-
-      // Try to use webm, fallback to whatever is available
       const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
         ? "audio/webm;codecs=opus"
         : MediaRecorder.isTypeSupported("audio/webm")
-        ? "audio/webm"
-        : "";
-
+          ? "audio/webm"
+          : "";
       const options: MediaRecorderOptions = mimeType ? { mimeType } : {};
       const recorder = new MediaRecorder(stream, options);
       mediaRecorderRef.current = recorder;
@@ -174,7 +179,7 @@ export default function Home() {
         stream.getTracks().forEach((t) => t.stop());
       };
 
-      recorder.start(1000); // collect data every second for reliability
+      recorder.start(1000);
       setIsRecording(true);
       setRecordingTime(0);
       setAudioBlob(null);
@@ -183,12 +188,17 @@ export default function Home() {
         setRecordingTime((t) => t + 1);
       }, 1000);
     } catch {
-      toast.error("Impossibile accedere al microfono. Controlla i permessi del browser.");
+      toast.error(
+        "Impossibile accedere al microfono. Controlla i permessi del browser."
+      );
     }
   }, []);
 
   const stopRecording = useCallback(() => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+    if (
+      mediaRecorderRef.current &&
+      mediaRecorderRef.current.state !== "inactive"
+    ) {
       mediaRecorderRef.current.stop();
     }
     setIsRecording(false);
@@ -202,7 +212,6 @@ export default function Home() {
   const processAudio = useCallback(async () => {
     if (!audioBlob) return;
 
-    // Step 1: Transcribe
     setIsTranscribing(true);
     try {
       const formData = new FormData();
@@ -222,7 +231,6 @@ export default function Home() {
       setTranscribedText(text);
       setIsTranscribing(false);
 
-      // Step 2: Generate script
       setIsGenerating(true);
       const generateRes = await fetch("/api/generate-script", {
         method: "POST",
@@ -242,7 +250,10 @@ export default function Home() {
     } catch (error: unknown) {
       setIsTranscribing(false);
       setIsGenerating(false);
-      const msg = error instanceof Error ? error.message : "Errore durante l'elaborazione";
+      const msg =
+        error instanceof Error
+          ? error.message
+          : "Errore durante l'elaborazione";
       toast.error(msg);
     }
   }, [audioBlob, duration, language]);
@@ -253,6 +264,40 @@ export default function Home() {
     setCopied(true);
     toast.success("Script copiato negli appunti!");
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  /* ── Save as Word ── */
+  const saveAsWord = () => {
+    const lines = generatedScript.split("\n").filter((l) => l.trim());
+    const title = lines[0] ? lines[0].substring(0, 120) : "Script Video";
+    const bodyHtml = lines
+      .map(
+        (line) =>
+          '<p style="font-family:Calibri,sans-serif;font-size:12pt;line-height:1.6;margin-bottom:10pt;">' +
+          line +
+          "</p>"
+      )
+      .join("");
+    const html =
+      '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>' +
+      title +
+      '</title><style>body{font-family:Calibri,sans-serif;margin:40px;}h1{font-size:18pt;color:#32B29A;margin-bottom:20pt;font-family:Georgia,serif;}</style></head><body><h1>' +
+      title +
+      "</h1>" +
+      bodyHtml +
+      "</body></html>";
+    const blob = new Blob(["\ufeff" + html], {
+      type: "application/msword",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "script-video.doc";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.success("Script salvato in Word!");
   };
 
   /* ── Reset ── */
@@ -270,17 +315,26 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: "var(--color-cream)" }}>
+    <div
+      className="min-h-screen flex flex-col"
+      style={{ background: "var(--color-cream)" }}
+    >
       {/* Header */}
       <header className="w-full py-6 px-6 flex items-center justify-center border-b border-gray-100 bg-white/80 backdrop-blur-sm">
         <div className="text-center">
           <h1
             className="text-2xl md:text-3xl font-semibold tracking-tight"
-            style={{ fontFamily: "var(--font-heading)", color: "var(--color-teal)" }}
+            style={{
+              fontFamily: "var(--font-heading)",
+              color: "var(--color-teal)",
+            }}
           >
             Dott.ssa Roberta Costanzo
           </h1>
-          <p className="text-sm text-[var(--color-muted)] mt-1" style={{ fontFamily: "var(--font-body)" }}>
+          <p
+            className="text-sm text-[var(--color-muted)] mt-1"
+            style={{ fontFamily: "var(--font-body)" }}
+          >
             Dalla tua voce, uno script video professionale
           </p>
         </div>
@@ -341,8 +395,12 @@ export default function Home() {
                 onClick={handleContinue}
                 className="mt-8 px-8 py-3 rounded-full text-white font-medium transition-all hover:shadow-lg active:scale-[0.98]"
                 style={{ background: "var(--color-teal)" }}
-                onMouseEnter={(e) => (e.currentTarget.style.background = "var(--color-teal-dark)")}
-                onMouseLeave={(e) => (e.currentTarget.style.background = "var(--color-teal)")}
+                onMouseEnter={(e) =>
+                  (e.currentTarget.style.background = "var(--color-teal-dark)")
+                }
+                onMouseLeave={(e) =>
+                  (e.currentTarget.style.background = "var(--color-teal)")
+                }
               >
                 Continua
               </button>
@@ -376,7 +434,12 @@ export default function Home() {
                 {/* Timer */}
                 <div
                   className="text-5xl font-light tracking-wider tabular-nums"
-                  style={{ fontFamily: "var(--font-heading)", color: isRecording ? "var(--color-teal)" : "var(--color-dark)" }}
+                  style={{
+                    fontFamily: "var(--font-heading)",
+                    color: isRecording
+                      ? "var(--color-teal)"
+                      : "var(--color-dark)",
+                  }}
                 >
                   {formatTime(recordingTime)}
                 </div>
@@ -386,7 +449,10 @@ export default function Home() {
                   {isRecording && (
                     <div
                       className="absolute inset-0 rounded-full animate-pulse-ring"
-                      style={{ background: "var(--color-teal)", opacity: 0.3 }}
+                      style={{
+                        background: "var(--color-teal)",
+                        opacity: 0.3,
+                      }}
                     />
                   )}
                   <button
@@ -408,8 +474,8 @@ export default function Home() {
                   {isRecording
                     ? "Registrazione in corso... clicca per fermare"
                     : audioBlob
-                    ? `Registrazione completata (${formatTime(recordingTime)})`
-                    : "Clicca per iniziare la registrazione"}
+                      ? `Registrazione completata (${formatTime(recordingTime)})`
+                      : "Clicca per iniziare la registrazione"}
                 </p>
 
                 {/* Action buttons after recording */}
@@ -431,8 +497,13 @@ export default function Home() {
                       onClick={processAudio}
                       className="px-8 py-2.5 rounded-full text-white font-medium transition-all hover:shadow-lg active:scale-[0.98]"
                       style={{ background: "var(--color-teal)" }}
-                      onMouseEnter={(e) => (e.currentTarget.style.background = "var(--color-teal-dark)")}
-                      onMouseLeave={(e) => (e.currentTarget.style.background = "var(--color-teal)")}
+                      onMouseEnter={(e) =>
+                        (e.currentTarget.style.background =
+                          "var(--color-teal-dark)")
+                      }
+                      onMouseLeave={(e) =>
+                        (e.currentTarget.style.background = "var(--color-teal)")
+                      }
                     >
                       Genera Script
                     </button>
@@ -445,7 +516,8 @@ export default function Home() {
                 onClick={() => setStep(1)}
                 className="mt-4 flex items-center gap-2 text-sm text-[var(--color-muted)] hover:text-[var(--color-teal)] transition-colors"
               >
-                <ArrowLeft className="w-4 h-4" /> Torna alla configurazione
+                <ArrowLeft className="w-4 h-4" />
+                Torna alla configurazione
               </button>
             </div>
           )}
@@ -453,13 +525,18 @@ export default function Home() {
           {/* STEP 2b: Processing */}
           {(isTranscribing || isGenerating) && (
             <div className="animate-fade-in-up flex flex-col items-center py-16 gap-6">
-              <Loader2 className="w-12 h-12 animate-spin" style={{ color: "var(--color-teal)" }} />
+              <Loader2
+                className="w-12 h-12 animate-spin"
+                style={{ color: "var(--color-teal)" }}
+              />
               <div className="text-center">
                 <h3
                   className="text-2xl font-medium mb-2"
                   style={{ fontFamily: "var(--font-heading)" }}
                 >
-                  {isTranscribing ? "Trascrizione in corso..." : "Generazione script..."}
+                  {isTranscribing
+                    ? "Trascrizione in corso..."
+                    : "Generazione script..."}
                 </h3>
                 <p className="text-[var(--color-muted)] text-sm">
                   {isTranscribing
@@ -490,7 +567,11 @@ export default function Home() {
               </h2>
               <p className="text-[var(--color-muted)] mb-6">
                 Ecco il tuo script video da {duration} minuti in{" "}
-                {language === "it" ? "italiano" : language === "en" ? "inglese" : "portoghese"}
+                {language === "it"
+                  ? "italiano"
+                  : language === "en"
+                    ? "inglese"
+                    : "portoghese"}
               </p>
 
               {/* Transcribed text (collapsible) */}
@@ -508,7 +589,10 @@ export default function Home() {
               {/* Generated script */}
               <div className="relative bg-white rounded-2xl border border-gray-100 shadow-sm p-6 md:p-8">
                 <div className="prose prose-gray max-w-none">
-                  <div className="whitespace-pre-wrap leading-relaxed text-[var(--color-dark)]" style={{ fontFamily: "var(--font-body)" }}>
+                  <div
+                    className="whitespace-pre-wrap leading-relaxed text-[var(--color-dark)]"
+                    style={{ fontFamily: "var(--font-body)" }}
+                  >
                     {generatedScript}
                   </div>
                 </div>
@@ -527,7 +611,7 @@ export default function Home() {
               </div>
 
               {/* Action buttons */}
-              <div className="flex gap-3 mt-8">
+              <div className="flex flex-wrap gap-3 mt-8">
                 <button
                   onClick={resetAll}
                   className="px-6 py-2.5 rounded-full border border-gray-300 text-[var(--color-dark)] font-medium transition-all hover:border-[var(--color-teal)] hover:text-[var(--color-teal)]"
@@ -541,12 +625,26 @@ export default function Home() {
                   onClick={copyScript}
                   className="px-8 py-2.5 rounded-full text-white font-medium transition-all hover:shadow-lg active:scale-[0.98]"
                   style={{ background: "var(--color-teal)" }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = "var(--color-teal-dark)")}
-                  onMouseLeave={(e) => (e.currentTarget.style.background = "var(--color-teal)")}
+                  onMouseEnter={(e) =>
+                    (e.currentTarget.style.background =
+                      "var(--color-teal-dark)")
+                  }
+                  onMouseLeave={(e) =>
+                    (e.currentTarget.style.background = "var(--color-teal)")
+                  }
                 >
                   <span className="flex items-center gap-2">
                     <Copy className="w-4 h-4" />
                     {copied ? "Copiato!" : "Copia script"}
+                  </span>
+                </button>
+                <button
+                  onClick={saveAsWord}
+                  className="px-8 py-2.5 rounded-full border-2 border-[var(--color-teal)] text-[var(--color-teal)] font-medium transition-all hover:bg-[var(--color-teal)] hover:text-white hover:shadow-lg active:scale-[0.98]"
+                >
+                  <span className="flex items-center gap-2">
+                    <Download className="w-4 h-4" />
+                    Salva in Word
                   </span>
                 </button>
               </div>
@@ -557,7 +655,10 @@ export default function Home() {
 
       {/* Footer */}
       <footer className="py-4 text-center border-t border-gray-100">
-        <p className="text-xs text-[var(--color-muted)]" style={{ fontFamily: "var(--font-body)" }}>
+        <p
+          className="text-xs text-[var(--color-muted)]"
+          style={{ fontFamily: "var(--font-body)" }}
+        >
           Dott.ssa Roberta Costanzo — Script video con intelligenza artificiale
         </p>
       </footer>
