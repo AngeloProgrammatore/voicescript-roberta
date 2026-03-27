@@ -20,7 +20,8 @@ export async function POST(req: NextRequest) {
 
     // If file is small enough, transcribe directly
     if (totalSize <= MAX_CHUNK_SIZE) {
-      const file = new File([arrayBuffer], "audio.webm", { type: audioFile.type || "audio/webm" });
+      const ext = (audioFile.type && audioFile.type.includes("mp4")) ? "audio.mp4" : "audio.webm";
+        const file = new File([arrayBuffer], ext, { type: audioFile.type || "audio/mp4" });
       const transcription = await openai.audio.transcriptions.create({
         model: "whisper-1",
         file: file,
@@ -41,8 +42,9 @@ export async function POST(req: NextRequest) {
 
     const transcriptions = await Promise.all(
       chunks.map(async (chunk, i) => {
-        const file = new File([chunk], `audio_part_${i}.webm`, {
-          type: audioFile.type || "audio/webm",
+        const chunkExt = (audioFile.type && audioFile.type.includes("mp4")) ? ".mp4" : ".webm";
+            const file = new File([chunk], "audio_part_" + i + chunkExt, {
+          type: audioFile.type || "audio/mp4",
         });
         const result = await openai.audio.transcriptions.create({
           model: "whisper-1",
