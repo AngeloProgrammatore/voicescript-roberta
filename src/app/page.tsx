@@ -108,7 +108,7 @@ export default function Home() {
   const startRecording = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus") ? "audio/webm;codecs=opus" : MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "";
+      const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus") ? "audio/webm;codecs=opus" : MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : MediaRecorder.isTypeSupported("audio/mp4") ? "audio/mp4" : "";
       const options: MediaRecorderOptions = mimeType ? { mimeType } : {};
       const recorder = new MediaRecorder(stream, options);
       mediaRecorderRef.current = recorder;
@@ -116,7 +116,7 @@ export default function Home() {
 
       recorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
       recorder.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: mimeType || "audio/webm" });
+        const blob = new Blob(chunksRef.current, { type: mimeType || "audio/mp4" });
         setAudioBlob(blob);
         stream.getTracks().forEach((t) => t.stop());
       };
@@ -142,7 +142,8 @@ export default function Home() {
     setIsTranscribing(true);
     try {
       const formData = new FormData();
-      formData.append("audio", audioBlob, "recording.webm");
+      var ext = (audioBlob.type && audioBlob.type.includes("mp4")) ? ".mp4" : ".webm";
+      formData.append("audio", audioBlob, "recording" + ext);
       const transcribeRes = await fetch("/api/transcribe", { method: "POST", body: formData });
       if (!transcribeRes.ok) { const err = await transcribeRes.json(); throw new Error(err.error || "Errore nella trascrizione"); }
       const { text } = await transcribeRes.json();
