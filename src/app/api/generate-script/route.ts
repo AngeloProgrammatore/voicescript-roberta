@@ -30,7 +30,6 @@ export async function POST(req: NextRequest) {
     };
     const ctaBlock = ctaMap[language] || ctaMap.it;
 
-    const wordCount = duration === "2" ? "~300 parole" : "~1500 parole";
     const adaptInstr = duration === "2"
       ? "Sintetizza e condensa il contenuto per stare in 2 minuti (~300 parole)"
       : "Espandi e approfondisci il contenuto per riempire 10 minuti (~1500 parole)";
@@ -43,14 +42,14 @@ export async function POST(req: NextRequest) {
       "- Adatta il testo per renderlo fluido e naturale come script parlato per video\n" +
       "- " + adaptInstr + "\n" +
       "- Il risultato deve essere un testo continuo, pronto per essere letto davanti alla camera\n" +
-      "- Non aggiungere introduzioni tipo Ecco lo script o commenti tuoi — fornisci direttamente lo script\n" +
+      "- Non aggiungere introduzioni tipo Ecco lo script o commenti tuoi - fornisci direttamente lo script\n" +
       "- FORMATTAZIONE: usa paragrafi ben separati, frasi chiare e pulite, facili da leggere. Ogni concetto deve avere il suo paragrafo\n" +
       "- STRUTTURA OBBLIGATORIA: dopo il paragrafo introduttivo dello script, DEVI inserire ESATTAMENTE questo blocco (senza modificarlo): " + ctaBlock + "\n" +
       "  Poi continua con il resto dello script.\n\n" +
       "TESTO TRASCRITTO:\n" + text;
 
     const message = await anthropic.messages.create({
-      model: "claude-sonnet-4-5-20250514",
+      model: "claude-sonnet-4-20250514",
       max_tokens: 4096,
       messages: [
         {
